@@ -31,9 +31,17 @@ def get_song(session, song_id):
 def get_artist(session, artist_id):
     return session.get(BASE_URL.format('artists/{}'.format(artist_id))).json()
 
-def get_search(session, artist):
-    return session.get(BASE_URL.format('search/?q={}'.format(artist))).json()
+def get_search(artist):
+    try:
+        params = urllib.parse.urlencode({'artist': artist})
+        return search_session.get(BASE_URL.format('search/?q={}'.format(artist))).json()
+    except:
+        return None
 
+def insert_into_mongo(info, artist):
+    genius.insert_one({
+        artist.replace(".",'') : info
+    })
 
 if __name__ == '__main__':
 
@@ -46,16 +54,22 @@ if __name__ == '__main__':
     # #pprint.pprint(get_song(song_session, 378195))
     # pprint.pprint(get_search(search_session, ['Kendrick', 'Lamar']))
 
-    params = urllib.parse.urlencode({'artist': 'Kendrick Lamar'})
-    with open('artists.csv') as f:
-        pass
-
     '''
     PyMongo:
     '''
+    # import pdb
+    # pdb.set_trace()
     client = MongoClient('mongodb://127.0.0.1:27017')
     db = client.genius
     genius = db.genius
-    genius.insert_one({
-        
-    })
+
+    search_session = create_session('XXD8nij5Ebt7za_0ezVQ-FEh2h2rMdiKCPWlQgnIt5BIdfUu31w6r_86sQsKcLtH')
+
+    with open('artists.csv') as f:
+        for artist in f:
+            info = get_search(artist)
+            if info:
+                insert_into_mongo(info, artist)
+            else:
+                with open('did-not-work.csv', 'w') as f:
+                    f.write(artist + '\n')
