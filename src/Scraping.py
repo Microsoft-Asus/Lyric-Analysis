@@ -21,16 +21,19 @@ def get_urls(artists_object):
 
     url_list = defaultdict(list)
 
-    try:
-        for artists in artists_object:
-            info = list(artists.keys())
-            info.remove('_id')
+    for artists in artists_object:
+        info = list(artists.keys())
+        info.remove('_id')
+
+        try:
             for song in artists[info[0]]['response']['hits']:
-                s = song['result']['url']
-                url_list[info[0]].append(s)
-        return url_list
-    except:
-        pdb.set_trace()
+                a = song['result']['url']
+                url_list[info[0]].append(a)
+
+        except (KeyError, TypeError) as e:
+            continue
+
+    return url_list
 
 
 def add_dict_to_mongo(dictionary):
@@ -41,7 +44,7 @@ def add_dict_to_mongo(dictionary):
     This function takes in a dictionary (in my case {artists: url requests) and loads it into mongo in a collection.
     """
 
-    return artists_urls.insert_one(dictionary)
+    artists_urls_2.insert_one(dictionary)
 
 
 def get_soup(url):
@@ -53,10 +56,12 @@ def get_soup(url):
     """
 
     req = requests.get(url)
-    return req
-    #soup = BeautifulSoup(req.content)
-    #div = soup.find("div", {"class": "lyrics"})
-    #return div
+    soup = BeautifulSoup(req.content)
+    try:
+        div = soup.find("div", {"class": "lyrics"}).get_text()
+    except:
+        pdb.set_trace()
+    return div
 
 
 def get_lyrics(collection):
@@ -66,7 +71,6 @@ def get_lyrics(collection):
     div_lyrics = soup.find("div", {"class": "lyrics"})
 
 
-
 if __name__ == '__main__':
 
     '''
@@ -74,8 +78,9 @@ if __name__ == '__main__':
     '''
     client = MongoClient('mongodb://127.0.0.1:27017')
     db = client.genius
-    genius = db.genius
+    artist_info = db.genius
     artists_urls = db.artists_url
+    artists_urls_2 = db.artists_urls_2
 
     '''
     Put the artists from artists.csv into a list.
@@ -89,20 +94,20 @@ if __name__ == '__main__':
     '''
     Get urls of the lyrics to the top songs from the artists
     '''
-    artists_songs = genius.find()
+    artists_songs = artist_info.find()
     #pdb.set_trace()
     urls = get_urls(artists_songs)
 
     soups_list = []
     # import pdb; pdb.set_trace()
     for artist, url_list in urls.items():
+        if artists_urls.find_one({artist:{"$exists":1}}):
+            continue
+
         artists_soups = defaultdict(list)
 
         for url in url_list:
-            artists_soups[artist].append(get_soup(url).content)
-            break
+            artists_soups[artist].append(get_soup(url))
 
         artists_soups_dict = dict(artists_soups)
         add_dict_to_mongo(artists_soups_dict)
-        break
-
