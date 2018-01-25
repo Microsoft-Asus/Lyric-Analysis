@@ -1,5 +1,6 @@
 import pandas as pd
 from pymongo import MongoClient
+from pymongo.cursor import CursorType
 import copy
 import requests
 from bs4 import BeautifulSoup
@@ -59,10 +60,16 @@ def get_soup(url):
     soup = BeautifulSoup(req.content)
     try:
         div = soup.find("div", {"class": "lyrics"}).get_text()
+        return div
     except:
-        pdb.set_trace()
-    return div
+        pass
 
+
+def in_dict(value, dictionary):
+    for v in dictionary.values():
+        if value in v:
+            return True
+        return False
 
 def get_lyrics(collection):
 
@@ -107,7 +114,10 @@ if __name__ == '__main__':
         artists_soups = defaultdict(list)
 
         for url in url_list:
-            artists_soups[artist].append(get_soup(url))
+            if in_dict(get_soup(url), artists_soups):
+                continue
+            else:
+                artists_soups[artist].append(get_soup(url))
 
         artists_soups_dict = dict(artists_soups)
         add_dict_to_mongo(artists_soups_dict)
