@@ -1,10 +1,9 @@
-import pandas as pd
 from pymongo import MongoClient
 from pymongo.cursor import CursorType
-import copy
 import requests
 from bs4 import BeautifulSoup
 from collections import defaultdict
+import threading
 import pdb
 import warnings
 warnings.filterwarnings('ignore')
@@ -15,9 +14,9 @@ def get_urls(artists_object):
     INPUT: Mongo collections object
     OUTPUT: None
 
-    This function takes in a mongo collection with the keys being the id and artists and the values are JSON objects. It
-    then removes the id key. With that new collection, the function then indexes into the JSON object to retrieve the
-    urls.
+    This function takes in a mongo collection with the keys being the id and artists and the values are JSON objects.
+    It then removes the id key. With that new collection, the function then indexes into the JSON object to
+    retrieve the urls.
     """
 
     url_list = defaultdict(list)
@@ -71,11 +70,33 @@ def in_dict(value, dictionary):
             return True
         return False
 
-def get_lyrics(collection):
 
-    divs = list(collection.values())
-    soup = BeautifulSoup(divs)
-    div_lyrics = soup.find("div", {"class": "lyrics"})
+def multi_threading(num_of_threads):
+    threads = []
+    for i in range(num_of_threads+1):
+        thread = threading.Thread(target=get_lyrics, args=(urls,))
+        thread.start()
+        threads.append(thread)
+
+    return threads
+
+
+def get_lyrics(urls):
+
+    for art, url_list in urls.items():
+        if artists_urls_2.find_one({art:{"$exists":1}}):
+            continue
+
+        artists_soups = defaultdict(list)
+
+        for url in url_list:
+            if in_dict(get_soup(url), artists_soups):
+                continue
+            else:
+                artists_soups[art].append(get_soup(url))
+
+        artists_soups_dict = dict(artists_soups)
+        add_dict_to_mongo(artists_soups_dict)
 
 
 if __name__ == '__main__':
@@ -102,22 +123,5 @@ if __name__ == '__main__':
     Get urls of the lyrics to the top songs from the artists
     '''
     artists_songs = artist_info.find()
-    #pdb.set_trace()
     urls = get_urls(artists_songs)
 
-    soups_list = []
-    # import pdb; pdb.set_trace()
-    for artist, url_list in urls.items():
-        if artists_urls.find_one({artist:{"$exists":1}}):
-            continue
-
-        artists_soups = defaultdict(list)
-
-        for url in url_list:
-            if in_dict(get_soup(url), artists_soups):
-                continue
-            else:
-                artists_soups[artist].append(get_soup(url))
-
-        artists_soups_dict = dict(artists_soups)
-        add_dict_to_mongo(artists_soups_dict)
